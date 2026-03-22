@@ -10,9 +10,13 @@ const { randomUUID } = require('crypto');
 const rateLimit = require('express-rate-limit');
 
 const agentAuth = require('@/agent/middleware/agent-auth');
-const { runAgent, runAgentStream } = require('@/agent/engine');
+const { runAgent, runAgentStream, setHooks } = require('@/agent/engine');
 const registry = require('@/agent/registry');
 const config = require('@/agent/config');
+const observability = require('@/agent/observability');
+
+// Wire observability hooks into the engine on startup
+setHooks(observability.createHooks());
 
 const router = express.Router();
 
@@ -116,6 +120,27 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
       });
     }
   }
+});
+
+/**
+ * GET /api/agent/metrics — Admin-only metrics endpoint.
+ *
+ * Returns aggregated observability stats: top tools by usage, top tools by error rate,
+ * average chain length, cost per conversation, LLM and router metrics.
+ */
+router.get('/agent/metrics', agentAuth, (req, res) => {
+  if (req.agentContext.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      error: 'Admin access required',
+      code: 'FORBIDDEN',
+    });
+  }
+
+  return res.json({
+    success: true,
+    data: observability.metrics.getMetricsSummary(),
+  });
 });
 
 /**

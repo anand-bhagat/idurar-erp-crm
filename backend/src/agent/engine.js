@@ -9,6 +9,7 @@ const registry = require('./registry');
 const config = require('./config');
 const router = require('./router');
 const { sanitizer, injectionDetector, rateLimiter, tokenBudget, circuitBreaker } = require('./guardrails');
+const observability = require('./observability');
 
 /**
  * Tool status messages for SSE events.
@@ -47,6 +48,27 @@ function setHooks(newHooks) {
 }
 
 /**
+ * Create a request stats accumulator for summary logging.
+ */
+function createRequestStats(userContext, message) {
+  return {
+    conversationId: userContext.conversationId,
+    userId: userContext.userId,
+    messageLength: message ? message.length : 0,
+    routerUsed: false,
+    routedCategories: [],
+    llmCalls: 0,
+    toolCalls: 0,
+    tools: [],
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCachedTokens: 0,
+    totalCost: 0,
+    startTime: Date.now(),
+  };
+}
+
+/**
  * Delegate to guardrail modules for token budget and circuit breaker.
  * These thin wrappers maintain the engine's existing API.
  */
@@ -80,24 +102,31 @@ function getToolStatusMessage(toolName) {
 async function runAgent({ message, frontendResult, conversationHistory, userContext, adapter, tools }) {
   const MAX_ITERATIONS = config.llm.maxIterations;
   const conversationId = userContext.conversationId;
+  const stats = createRequestStats(userContext, message);
+
+  function finalize(result) {
+    stats.totalDurationMs = Date.now() - stats.startTime;
+    observability.finalizeRequest(userContext.traceId, stats);
+    return result;
+  }
 
   // Rate limiting check
   const rateCheck = rateLimiter.checkAllLimits(userContext);
   if (!rateCheck.allowed) {
-    return { type: 'response', message: rateCheck.error };
+    return finalize({ type: 'response', message: rateCheck.error });
   }
 
   // Token budget check
   const budgetCheck = checkTokenBudget(conversationId);
   if (!budgetCheck.allowed) {
-    return { type: 'response', message: budgetCheck.error };
+    return finalize({ type: 'response', message: budgetCheck.error });
   }
 
   // Prompt injection detection (only for new user messages)
   if (message) {
     const injectionCheck = injectionDetector.checkMessage(message, hooks.onGuardrailCheck, userContext);
     if (!injectionCheck.allowed) {
-      return { type: 'response', message: injectionCheck.reason };
+      return finalize({ type: 'response', message: injectionCheck.reason });
     }
   }
 
@@ -134,12 +163,20 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
     if (llmResponse.usage) {
       trackTokenUsage(conversationId, llmResponse.usage);
 
+      stats.llmCalls++;
+      stats.totalInputTokens += llmResponse.usage.inputTokens || 0;
+      stats.totalOutputTokens += llmResponse.usage.outputTokens || 0;
+      stats.totalCachedTokens += llmResponse.usage.cachedTokens || 0;
+
+      const toolCallCount = llmResponse.toolCalls ? llmResponse.toolCalls.length : 0;
+
       if (hooks.onLLMCall) {
         hooks.onLLMCall({
           model: config.llm.model,
           usage: llmResponse.usage,
           durationMs: duration,
           traceId: userContext.traceId,
+          toolCallCount,
         });
       }
     }
@@ -147,7 +184,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
     // Check budget after LLM call
     const postCallBudget = checkTokenBudget(conversationId);
     if (!postCallBudget.allowed) {
-      return { type: 'response', message: postCallBudget.error };
+      return finalize({ type: 'response', message: postCallBudget.error });
     }
 
     // If LLM wants to call tools
@@ -214,6 +251,12 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
         const result = await registry.executeTool(toolCall.name, toolCall.params, userContext);
         const toolDuration = Date.now() - toolStart;
 
+        // Accumulate tool stats
+        stats.toolCalls++;
+        if (!stats.tools.includes(toolCall.name)) {
+          stats.tools.push(toolCall.name);
+        }
+
         // Track success/failure for circuit breaker
         if (result.success === false && result.code === 'INTERNAL_ERROR') {
           circuitBreaker.recordFailure(toolCall.name);
@@ -234,7 +277,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
 
         // Frontend tool — return to widget for execution
         if (result.type === 'frontend_action') {
-          return { ...result, toolCallId: toolCall.id };
+          return finalize({ ...result, toolCallId: toolCall.id });
         }
 
         // Sanitize tool result before feeding back to LLM
@@ -253,15 +296,15 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
 
     // If LLM produced text, we're done
     if (llmResponse.content) {
-      return { type: 'response', message: llmResponse.content };
+      return finalize({ type: 'response', message: llmResponse.content });
     }
   }
 
   // Max iterations reached
-  return {
+  return finalize({
     type: 'response',
     message: 'I was unable to complete this request. Please try rephrasing.',
-  };
+  });
 }
 
 /**
@@ -273,9 +316,15 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
 async function runAgentStream({ message, frontendResult, conversationHistory, userContext, adapter, tools, res }) {
   const MAX_ITERATIONS = config.llm.maxIterations;
   const conversationId = userContext.conversationId;
+  const stats = createRequestStats(userContext, message);
+
+  function finalize() {
+    stats.totalDurationMs = Date.now() - stats.startTime;
+    observability.finalizeRequest(userContext.traceId, stats);
+  }
 
   function sendSSE(event) {
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
+    res.write(`data: ${JSON.stringify({ ...event, traceId: userContext.traceId })}\n\n`);
   }
 
   // Rate limiting check
@@ -283,6 +332,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
   if (!rateCheck.allowed) {
     sendSSE({ type: 'error', message: rateCheck.error });
     sendSSE({ type: 'done', conversationId });
+    finalize();
     return;
   }
 
@@ -291,6 +341,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
   if (!budgetCheck.allowed) {
     sendSSE({ type: 'error', message: budgetCheck.error });
     sendSSE({ type: 'done', conversationId });
+    finalize();
     return;
   }
 
@@ -300,6 +351,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
     if (!injectionCheck.allowed) {
       sendSSE({ type: 'error', message: injectionCheck.reason });
       sendSSE({ type: 'done', conversationId });
+      finalize();
       return;
     }
   }
@@ -338,12 +390,20 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
     if (llmResponse.usage) {
       trackTokenUsage(conversationId, llmResponse.usage);
 
+      stats.llmCalls++;
+      stats.totalInputTokens += llmResponse.usage.inputTokens || 0;
+      stats.totalOutputTokens += llmResponse.usage.outputTokens || 0;
+      stats.totalCachedTokens += llmResponse.usage.cachedTokens || 0;
+
+      const toolCallCount = llmResponse.toolCalls ? llmResponse.toolCalls.length : 0;
+
       if (hooks.onLLMCall) {
         hooks.onLLMCall({
           model: config.llm.model,
           usage: llmResponse.usage,
           durationMs: duration,
           traceId: userContext.traceId,
+          toolCallCount,
         });
       }
     }
@@ -386,6 +446,12 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
         const result = await registry.executeTool(toolCall.name, toolCall.params, userContext);
         const toolDuration = Date.now() - toolStart;
 
+        // Accumulate tool stats
+        stats.toolCalls++;
+        if (!stats.tools.includes(toolCall.name)) {
+          stats.tools.push(toolCall.name);
+        }
+
         if (result.success === false && result.code === 'INTERNAL_ERROR') {
           circuitBreaker.recordFailure(toolCall.name);
         } else if (result.success !== false) {
@@ -405,6 +471,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
         if (result.type === 'frontend_action') {
           sendSSE({ type: 'frontend_action', ...result, toolCallId: toolCall.id });
           sendSSE({ type: 'done', conversationId });
+          finalize();
           return;
         }
 
@@ -431,6 +498,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
   }
 
   sendSSE({ type: 'done', conversationId });
+  finalize();
 }
 
 /**
@@ -449,6 +517,8 @@ async function resolveTools(message, userContext, conversationHistory, adapter) 
   const { role, conversationId } = userContext;
 
   if (router.shouldRoute(role)) {
+    const routerStart = Date.now();
+
     const result = await router.getToolsForMessage(
       message,
       conversationId,
@@ -456,6 +526,8 @@ async function resolveTools(message, userContext, conversationHistory, adapter) 
       role,
       adapter
     );
+
+    const routerDuration = Date.now() - routerStart;
 
     // Log routing decision
     if (hooks.onRequestTrace) {
@@ -466,6 +538,7 @@ async function resolveTools(message, userContext, conversationHistory, adapter) 
         toolCount: result.tools.length,
         cached: result.cached,
         fallback: result.fallback,
+        durationMs: routerDuration,
       });
     }
 
@@ -496,6 +569,7 @@ function clearEngineState() {
   circuitBreaker.clearAll();
   rateLimiter.clearLimits();
   router.clearCache();
+  observability.metrics.clearAll();
   hooks = {
     onToolExecution: null,
     onLLMCall: null,

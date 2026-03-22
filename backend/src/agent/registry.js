@@ -11,6 +11,7 @@
 const { checkAccess } = require('./helpers/auth');
 const { validateParams } = require('./helpers/validate');
 const { errorResponse } = require('./helpers/response');
+const { resultCache } = require('./guardrails');
 
 /**
  * Internal tool store.
@@ -188,8 +189,24 @@ async function executeTool(name, params, context) {
       return errorResponse(validation.error, 'INVALID_PARAM');
     }
 
+    // Check cache for cacheable tools
+    const cacheable = isCacheable(tool, name);
+    if (cacheable) {
+      const cached = resultCache.get(name, params);
+      if (cached.hit) {
+        return cached.result;
+      }
+    }
+
     try {
-      return await tool.handler(params, context);
+      const result = await tool.handler(params, context);
+
+      // Cache successful results for cacheable tools
+      if (cacheable && result.success !== false) {
+        resultCache.set(name, params, result);
+      }
+
+      return result;
     } catch (err) {
       return errorResponse(`Tool execution failed: ${err.message}`, 'INTERNAL_ERROR');
     }
@@ -208,6 +225,18 @@ async function executeTool(name, params, context) {
   }
 
   return errorResponse(`Unknown execution type for tool: ${name}`, 'INTERNAL_ERROR');
+}
+
+/**
+ * Check if a tool is cacheable.
+ * Tools with explicit `cacheable` flag use that value.
+ * Otherwise, read-only tools (get_*, list_*, search_*, *_summary) default to cacheable.
+ * Write tools (create_*, update_*, delete_*) are never cached.
+ */
+function isCacheable(tool, toolName) {
+  if (typeof tool.cacheable === 'boolean') return tool.cacheable;
+  if (tool.execution !== 'backend') return false;
+  return /^(get_|list_|search_)/.test(toolName) || /_summary$/.test(toolName);
 }
 
 /**
