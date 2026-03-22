@@ -14,6 +14,7 @@ const adminAuth = require('./controllers/coreControllers/adminAuth');
 const errorHandlers = require('./handlers/errorHandlers');
 const erpApiRouter = require('./routes/appRoutes/appApi');
 const agentRouter = require('./routes/agentRoutes/agent');
+const { registerAllTools } = require('./agent/tools');
 
 const fileUpload = require('express-fileupload');
 // create our Express app
@@ -34,6 +35,9 @@ app.use(compression());
 
 // // default options
 // app.use(fileUpload());
+
+// Register agent tools before mounting routes
+registerAllTools();
 
 // Here our API Routes
 

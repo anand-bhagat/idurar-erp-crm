@@ -103,10 +103,18 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
   const MAX_ITERATIONS = config.llm.maxIterations;
   const conversationId = userContext.conversationId;
   const stats = createRequestStats(userContext, message);
+  const newMessages = []; // Track all new messages for persistence
 
   function finalize(result) {
     stats.totalDurationMs = Date.now() - stats.startTime;
     observability.finalizeRequest(userContext.traceId, stats);
+    result.stats = {
+      totalInputTokens: stats.totalInputTokens,
+      totalOutputTokens: stats.totalOutputTokens,
+      totalTokens: stats.totalInputTokens + stats.totalOutputTokens,
+      tools: stats.tools,
+    };
+    result.newMessages = newMessages;
     return result;
   }
 
@@ -133,8 +141,13 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
   // Build messages array
   let messages = [...conversationHistory];
 
+  function pushMsg(msg) {
+    messages.push(msg);
+    newMessages.push(msg);
+  }
+
   if (frontendResult) {
-    messages.push({
+    pushMsg({
       role: 'tool',
       tool_call_id: frontendResult.toolCallId,
       content: JSON.stringify({
@@ -143,7 +156,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
       }),
     });
   } else if (message) {
-    messages.push({ role: 'user', content: message });
+    pushMsg({ role: 'user', content: message });
   }
 
   // Agentic loop
@@ -189,7 +202,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
 
     // If LLM wants to call tools
     if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {
-      messages.push({
+      pushMsg({
         role: 'assistant',
         content: llmResponse.content || null,
         tool_calls: llmResponse.toolCalls.map((tc) => ({
@@ -202,15 +215,14 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
       for (const toolCall of llmResponse.toolCalls) {
         // Circuit breaker check
         if (circuitBreaker.isOpen(toolCall.name)) {
-          const circuitError = {
-            success: false,
-            error: `Tool "${toolCall.name}" is temporarily unavailable. Please try again later.`,
-            code: 'CIRCUIT_OPEN',
-          };
-          messages.push({
+          pushMsg({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: JSON.stringify(circuitError),
+            content: JSON.stringify({
+              success: false,
+              error: `Tool "${toolCall.name}" is temporarily unavailable. Please try again later.`,
+              code: 'CIRCUIT_OPEN',
+            }),
           });
           continue;
         }
@@ -218,7 +230,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
         // Per-tool rate limit check
         const toolRateCheck = rateLimiter.checkToolLimit(toolCall.name, userContext.userId);
         if (!toolRateCheck.allowed) {
-          messages.push({
+          pushMsg({
             role: 'tool',
             tool_call_id: toolCall.id,
             content: JSON.stringify({
@@ -234,7 +246,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
         if (hooks.onGuardrailCheck) {
           const guardrailResult = await hooks.onGuardrailCheck(toolCall.name, toolCall.params, userContext);
           if (guardrailResult && !guardrailResult.allowed) {
-            messages.push({
+            pushMsg({
               role: 'tool',
               tool_call_id: toolCall.id,
               content: JSON.stringify({
@@ -285,7 +297,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
         const category = toolDef ? toolDef.category : undefined;
         const sanitizedResult = sanitizer.sanitizeToolResult(result, toolCall.name, category);
 
-        messages.push({
+        pushMsg({
           role: 'tool',
           tool_call_id: toolCall.id,
           content: JSON.stringify(sanitizedResult),
@@ -296,6 +308,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
 
     // If LLM produced text, we're done
     if (llmResponse.content) {
+      newMessages.push({ role: 'assistant', content: llmResponse.content });
       return finalize({ type: 'response', message: llmResponse.content });
     }
   }
@@ -317,10 +330,18 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
   const MAX_ITERATIONS = config.llm.maxIterations;
   const conversationId = userContext.conversationId;
   const stats = createRequestStats(userContext, message);
+  const newMessages = []; // Track all new messages for persistence
 
   function finalize() {
     stats.totalDurationMs = Date.now() - stats.startTime;
     observability.finalizeRequest(userContext.traceId, stats);
+    return {
+      totalInputTokens: stats.totalInputTokens,
+      totalOutputTokens: stats.totalOutputTokens,
+      totalTokens: stats.totalInputTokens + stats.totalOutputTokens,
+      tools: stats.tools,
+      newMessages,
+    };
   }
 
   function sendSSE(event) {
@@ -332,8 +353,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
   if (!rateCheck.allowed) {
     sendSSE({ type: 'error', message: rateCheck.error });
     sendSSE({ type: 'done', conversationId });
-    finalize();
-    return;
+    return finalize();
   }
 
   // Check token budget
@@ -341,8 +361,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
   if (!budgetCheck.allowed) {
     sendSSE({ type: 'error', message: budgetCheck.error });
     sendSSE({ type: 'done', conversationId });
-    finalize();
-    return;
+    return finalize();
   }
 
   // Prompt injection detection
@@ -351,16 +370,20 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
     if (!injectionCheck.allowed) {
       sendSSE({ type: 'error', message: injectionCheck.reason });
       sendSSE({ type: 'done', conversationId });
-      finalize();
-      return;
+      return finalize();
     }
   }
 
   // Build messages array
   let messages = [...conversationHistory];
 
+  function pushMsg(msg) {
+    messages.push(msg);
+    newMessages.push(msg);
+  }
+
   if (frontendResult) {
-    messages.push({
+    pushMsg({
       role: 'tool',
       tool_call_id: frontendResult.toolCallId,
       content: JSON.stringify({
@@ -370,7 +393,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
     });
     sendSSE({ type: 'status', message: '\u270D\uFE0F Writing response...' });
   } else if (message) {
-    messages.push({ role: 'user', content: message });
+    pushMsg({ role: 'user', content: message });
   }
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -415,7 +438,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
     }
 
     if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {
-      messages.push({
+      pushMsg({
         role: 'assistant',
         content: llmResponse.content || null,
         tool_calls: llmResponse.toolCalls.map((tc) => ({
@@ -427,15 +450,14 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
 
       for (const toolCall of llmResponse.toolCalls) {
         if (circuitBreaker.isOpen(toolCall.name)) {
-          const circuitError = {
-            success: false,
-            error: `Tool "${toolCall.name}" is temporarily unavailable.`,
-            code: 'CIRCUIT_OPEN',
-          };
-          messages.push({
+          pushMsg({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: JSON.stringify(circuitError),
+            content: JSON.stringify({
+              success: false,
+              error: `Tool "${toolCall.name}" is temporarily unavailable.`,
+              code: 'CIRCUIT_OPEN',
+            }),
           });
           continue;
         }
@@ -471,8 +493,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
         if (result.type === 'frontend_action') {
           sendSSE({ type: 'frontend_action', ...result, toolCallId: toolCall.id });
           sendSSE({ type: 'done', conversationId });
-          finalize();
-          return;
+          return finalize();
         }
 
         // Sanitize tool result before feeding back to LLM
@@ -480,7 +501,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
         const category = toolDef ? toolDef.category : undefined;
         const sanitizedResult = sanitizer.sanitizeToolResult(result, toolCall.name, category);
 
-        messages.push({
+        pushMsg({
           role: 'tool',
           tool_call_id: toolCall.id,
           content: JSON.stringify(sanitizedResult),
@@ -492,13 +513,14 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
     }
 
     if (llmResponse.content) {
+      newMessages.push({ role: 'assistant', content: llmResponse.content });
       sendSSE({ type: 'text_delta', content: llmResponse.content });
       break;
     }
   }
 
   sendSSE({ type: 'done', conversationId });
-  finalize();
+  return finalize();
 }
 
 /**

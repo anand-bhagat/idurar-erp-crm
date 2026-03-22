@@ -27,6 +27,11 @@ export default function MessageBubble({ message }) {
           remarkPlugins={[remarkGfm]}
           components={{
             a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+            table: ({ node, ...props }) => (
+              <div className="agent-md-table-wrapper">
+                <table {...props} />
+              </div>
+            ),
           }}
         >
           {message.content}

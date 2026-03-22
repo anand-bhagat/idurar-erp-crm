@@ -10,7 +10,7 @@ const config = {
     // Provider: 'openai-compatible' or 'anthropic'
     provider: process.env.AGENT_LLM_PROVIDER || 'openai-compatible',
     baseUrl: process.env.AGENT_LLM_BASE_URL || 'https://api.deepinfra.com/v1/openai',
-    model: (process.env.AGENT_LLM_MODEL || 'zhipu-ai/glm-4.7-flash').toLowerCase(),
+    model: (process.env.AGENT_LLM_MODEL || 'zhipu-ai/glm-4.7-flash'),
     apiKey: process.env.AGENT_LLM_API_KEY,
     temperature: parseFloat(process.env.AGENT_LLM_TEMPERATURE) || 0,
     maxTokens: parseInt(process.env.AGENT_LLM_MAX_TOKENS, 10) || 4096,

@@ -18,17 +18,26 @@ class OpenAICompatibleAdapter extends BaseLLMAdapter {
   }
 
   /**
-   * Convert universal tool format to OpenAI's function calling format.
+   * Convert tool definitions to OpenAI's function calling format.
+   * Handles both universal format ({ name, description, parameters })
+   * and already-wrapped OpenAI format ({ type: 'function', function: { ... } }).
    */
   formatTools(tools) {
-    return tools.map((tool) => ({
-      type: 'function',
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-      },
-    }));
+    return tools.map((tool) => {
+      // Already in OpenAI format (from registry)
+      if (tool.type === 'function' && tool.function) {
+        return tool;
+      }
+      // Universal format
+      return {
+        type: 'function',
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        },
+      };
+    });
   }
 
   /**

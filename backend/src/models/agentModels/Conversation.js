@@ -86,13 +86,30 @@ conversationSchema.statics.appendMessage = async function (conversationId, messa
 };
 
 /**
+ * Normalize a message from LLM format (snake_case) to schema format (camelCase).
+ */
+function normalizeMessage(msg) {
+  const normalized = {
+    role: msg.role,
+    content: msg.content ?? null,
+    timestamp: new Date(),
+  };
+  // Map snake_case tool_call_id to camelCase toolCallId
+  if (msg.tool_call_id) normalized.toolCallId = msg.tool_call_id;
+  if (msg.toolCallId) normalized.toolCallId = msg.toolCallId;
+  // Preserve tool_calls array (assistant messages with tool invocations)
+  if (msg.tool_calls && msg.tool_calls.length > 0) normalized.tool_calls = msg.tool_calls;
+  return normalized;
+}
+
+/**
  * Append multiple messages to a conversation and update token count.
  */
 conversationSchema.statics.appendMessages = async function (conversationId, messages, tokensUsed = 0) {
   const update = {
     $push: {
       messages: {
-        $each: messages.map((m) => ({ ...m, timestamp: new Date() })),
+        $each: messages.map(normalizeMessage),
       },
     },
   };

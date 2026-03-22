@@ -74,8 +74,11 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
   // Get adapter
   const adapter = getAdapter();
 
+  // Load conversation history first — needed by both router and LLM
+  const history = await Conversation.getHistory(conversationId);
+
   // Resolve tools (uses router if enabled, otherwise all role-permitted tools)
-  const resolveResult = await resolveTools(message, userContext, [], adapter);
+  const resolveResult = await resolveTools(message, userContext, history, adapter);
   const tools = resolveResult.tools;
 
   // Build system prompt with conditional rules
@@ -84,8 +87,7 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
     toolDefinitions: tools,
   });
 
-  // Load conversation history and prepend system prompt
-  const history = await Conversation.getHistory(conversationId);
+  // Prepend system prompt to history
   const conversationHistory = [{ role: 'system', content: systemPrompt }, ...history];
 
   // Wire cost tracking into LLM hook
@@ -118,7 +120,7 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
     });
 
     try {
-      await runAgentStream({
+      const streamResult = await runAgentStream({
         message,
         frontendResult,
         conversationHistory,
@@ -128,11 +130,13 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
         res,
       });
 
-      // Save new messages to conversation
-      const newMessages = [];
-      if (message) newMessages.push({ role: 'user', content: message });
-      if (newMessages.length > 0) {
-        await Conversation.appendMessages(conversationId, newMessages);
+      // Save all messages (user, assistant tool_calls, tool results, final response) and token usage
+      if (streamResult?.newMessages?.length > 0) {
+        await Conversation.appendMessages(conversationId, streamResult.newMessages, streamResult.totalTokens || 0);
+      }
+      // Save active categories from router
+      if (resolveResult.routed && resolveResult.categories?.length > 0) {
+        await Conversation.updateCategories(conversationId, resolveResult.categories);
       }
     } catch (error) {
       console.error(`[agent:chat] SSE error traceId=${traceId} conversationId=${conversationId}`, error);
@@ -153,12 +157,12 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
         tools,
       });
 
-      // Save messages to conversation
-      const newMessages = [];
-      if (message) newMessages.push({ role: 'user', content: message });
-      if (result.message) newMessages.push({ role: 'assistant', content: result.message });
-      if (newMessages.length > 0) {
-        await Conversation.appendMessages(conversationId, newMessages);
+      // Save all messages and token usage to conversation
+      if (result.newMessages?.length > 0) {
+        await Conversation.appendMessages(conversationId, result.newMessages, result.stats?.totalTokens || 0);
+      }
+      if (resolveResult.routed && resolveResult.categories?.length > 0) {
+        await Conversation.updateCategories(conversationId, resolveResult.categories);
       }
 
       return res.json({

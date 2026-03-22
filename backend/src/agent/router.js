@@ -198,24 +198,12 @@ async function routeTools(message, history, userRole, adapter) {
  * @returns {object} { categories, tools, cached, fallback }
  */
 async function getToolsForMessage(message, conversationId, history, userRole, adapter) {
-  const maxCacheMessages = config.routing.cacheMessages || 5;
-
-  // Check cache
-  const cached = conversationToolCache.get(conversationId);
-  if (cached && cached.messageCount < maxCacheMessages) {
-    cached.messageCount++;
-    return {
-      categories: cached.categories,
-      tools: cached.tools,
-      cached: true,
-      fallback: cached.fallback,
-    };
-  }
-
-  // Route fresh
+  // Route fresh every message — conversation intent can change at any turn.
+  // The router call is lightweight (fast model, minimal tokens) so caching
+  // saves negligible cost while risking stale tool selection.
   const result = await routeTools(message, history, userRole, adapter);
 
-  // Cache the result
+  // Store latest categories for observability / conversation metadata
   conversationToolCache.set(conversationId, {
     categories: result.categories,
     tools: result.tools,

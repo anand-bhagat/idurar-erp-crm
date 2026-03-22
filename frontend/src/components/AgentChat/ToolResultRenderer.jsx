@@ -78,26 +78,28 @@ function DataTable({ rows }) {
   const columns = filterKeys(rows[0]).slice(0, 6); // Limit columns for readability
 
   return (
-    <table className="agent-data-table">
-      <thead>
-        <tr>
-          {columns.map((col) => (
-            <th key={col}>{formatKey(col)}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, i) => (
-          <tr key={i}>
+    <div className="agent-data-table-wrapper">
+      <table className="agent-data-table">
+        <thead>
+          <tr>
             {columns.map((col) => (
-              <td key={col} title={formatValue(row[col])}>
-                {formatValue(row[col])}
-              </td>
+              <th key={col}>{formatKey(col)}</th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i}>
+              {columns.map((col) => (
+                <td key={col} title={formatValue(row[col])}>
+                  {formatValue(row[col])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
