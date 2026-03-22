@@ -31,6 +31,16 @@ for (const filePath of modelsFiles) {
   require(path.resolve(filePath));
 }
 
+// Schedule hourly database reset for demo mode
+const cron = require('node-cron');
+const resetDb = require('./setup/resetDb');
+
+cron.schedule('0 * * * *', () => {
+  console.log('Running scheduled database reset...');
+  resetDb().catch((err) => console.error('Database reset failed:', err));
+});
+console.log('DB reset scheduled: runs every hour on the hour');
+
 // Start our app!
 const app = require('./app');
 app.set('port', process.env.PORT || 8888);

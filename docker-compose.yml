@@ -1,0 +1,39 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - idurar-net
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: backend/.env
+    environment:
+      - NODE_ENV=production
+      - DATABASE=mongodb://mongo:27017/idurar
+    ports:
+      - "8888:8888"
+    depends_on:
+      - mongo
+    networks:
+      - idurar-net
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+volumes:
+  mongo_data:
+
+networks:
+  idurar-net:
+    driver: bridge

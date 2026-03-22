@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 
 const cors = require('cors');
 const compression = require('compression');
@@ -47,6 +48,14 @@ app.use('/api', adminAuth.isValidAuthToken, erpApiRouter);
 app.use('/api', agentRouter);
 app.use('/download', coreDownloadRouter);
 app.use('/public', corePublicRouter);
+
+// Serve frontend in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+  app.get('*', (req, res) =>
+    res.sendFile(path.resolve(__dirname, '../../frontend/dist/index.html'))
+  );
+}
 
 // If that above routes didnt work, we 404 them and forward to error handler
 app.use(errorHandlers.notFound);
