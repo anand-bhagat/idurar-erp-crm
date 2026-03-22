@@ -25,10 +25,14 @@ function buildSystemPrompt({
   userContext,
   toolDefinitions = [],
 }) {
-  const hasCreateTools = toolDefinitions.some((t) => t.name.startsWith('create_'));
-  const hasDestructiveTools = toolDefinitions.some(
-    (t) => t.description && t.description.includes('DESTRUCTIVE')
-  );
+  const hasCreateTools = toolDefinitions.some((t) => {
+    const name = t.function?.name || t.name || '';
+    return name.startsWith('create_');
+  });
+  const hasDestructiveTools = toolDefinitions.some((t) => {
+    const desc = t.function?.description || t.description || '';
+    return desc.includes('DESTRUCTIVE');
+  });
 
   // Static content first for cache hits
   let prompt = `You are an AI assistant embedded in ${appName}. ${appDescription}
