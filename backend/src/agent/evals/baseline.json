@@ -1,0 +1,395 @@
+{
+  "date": "2026-03-22T07:06:30.152Z",
+  "model": "mock",
+  "systemPromptVersion": "1.0",
+  "passRate": 100,
+  "total": 57,
+  "passCount": 57,
+  "scores": {
+    "exact_match": 52,
+    "partial_match": 0,
+    "miss": 0,
+    "hallucination": 0,
+    "pass_no_tools": 5
+  },
+  "byCategory": {
+    "clients": {
+      "total": 10,
+      "pass": 10
+    },
+    "invoices": {
+      "total": 10,
+      "pass": 10
+    },
+    "payments": {
+      "total": 8,
+      "pass": 8
+    },
+    "settings": {
+      "total": 6,
+      "pass": 6
+    },
+    "admin": {
+      "total": 4,
+      "pass": 4
+    },
+    "navigation": {
+      "total": 5,
+      "pass": 5
+    },
+    "multi-tool": {
+      "total": 8,
+      "pass": 8
+    },
+    "edge-case": {
+      "total": 6,
+      "pass": 6
+    }
+  },
+  "byDifficulty": {
+    "simple": {
+      "total": 36,
+      "pass": 36
+    },
+    "medium": {
+      "total": 16,
+      "pass": 16
+    },
+    "hard": {
+      "total": 5,
+      "pass": 5
+    }
+  },
+  "toolMetrics": {
+    "search_clients": {
+      "expectedCount": 9,
+      "calledCount": 9,
+      "truePositives": 9,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "list_clients": {
+      "expectedCount": 3,
+      "calledCount": 3,
+      "truePositives": 3,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "get_client_summary": {
+      "expectedCount": 3,
+      "calledCount": 3,
+      "truePositives": 3,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "create_client": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "update_client": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "delete_client": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "navigate_to_customers": {
+      "expectedCount": 3,
+      "calledCount": 3,
+      "truePositives": 3,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "search_invoices": {
+      "expectedCount": 6,
+      "calledCount": 6,
+      "truePositives": 6,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "list_invoices": {
+      "expectedCount": 4,
+      "calledCount": 4,
+      "truePositives": 4,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "get_invoice_summary": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "create_invoice": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "update_invoice": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "delete_invoice": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "navigate_to_invoices": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "navigate_to_create_invoice": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "search_payments": {
+      "expectedCount": 4,
+      "calledCount": 4,
+      "truePositives": 4,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "list_payments": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "get_payment_summary": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "create_payment": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "update_payment": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "delete_payment": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "navigate_to_payments": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "get_setting": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "list_settings": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "get_settings_by_keys": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "update_setting": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "update_many_settings": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "get_admin_profile": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "update_admin_profile": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "navigate_to_profile": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "navigate_to_dashboard": {
+      "expectedCount": 2,
+      "calledCount": 2,
+      "truePositives": 2,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "navigate_to_settings": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "navigate_to_login": {
+      "expectedCount": 1,
+      "calledCount": 1,
+      "truePositives": 1,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    }
+  }
+}

@@ -13,7 +13,8 @@
     "upgrade": "node src/setup/upgrade.js",
     "reset": "node src/setup/reset.js",
     "test": "jest",
-    "test:agent": "jest --verbose"
+    "test:agent": "jest --verbose",
+    "eval": "node src/agent/evals/runner.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
