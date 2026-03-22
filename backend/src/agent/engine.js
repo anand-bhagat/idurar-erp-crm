@@ -7,6 +7,7 @@
 
 const registry = require('./registry');
 const config = require('./config');
+const router = require('./router');
 
 /**
  * Tool status messages for SSE events.
@@ -419,11 +420,67 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
 }
 
 /**
+ * Resolve tools for a user message — handles routing decision.
+ *
+ * If routing is enabled and total tools exceed the threshold, uses the
+ * two-stage router. Otherwise returns all role-permitted tools.
+ *
+ * @param {string} message - User message
+ * @param {object} userContext - { userId, role, conversationId, ... }
+ * @param {Array} conversationHistory - Previous messages
+ * @param {object} adapter - LLM adapter instance
+ * @returns {object} { tools, routed, categories, cached, fallback }
+ */
+async function resolveTools(message, userContext, conversationHistory, adapter) {
+  const { role, conversationId } = userContext;
+
+  if (router.shouldRoute(role)) {
+    const result = await router.getToolsForMessage(
+      message,
+      conversationId,
+      conversationHistory,
+      role,
+      adapter
+    );
+
+    // Log routing decision
+    if (hooks.onRequestTrace) {
+      hooks.onRequestTrace({
+        type: 'router_call',
+        traceId: userContext.traceId,
+        selectedCategories: result.categories,
+        toolCount: result.tools.length,
+        cached: result.cached,
+        fallback: result.fallback,
+      });
+    }
+
+    return {
+      tools: result.tools,
+      routed: true,
+      categories: result.categories,
+      cached: result.cached,
+      fallback: result.fallback,
+    };
+  }
+
+  // Below threshold — use all role-permitted tools
+  return {
+    tools: registry.getToolDefinitions(role),
+    routed: false,
+    categories: [],
+    cached: false,
+    fallback: false,
+  };
+}
+
+/**
  * Clear engine state (for testing).
  */
 function clearEngineState() {
   conversationTokenUsage.clear();
   toolFailureCounts.clear();
+  router.clearCache();
   hooks = {
     onToolExecution: null,
     onLLMCall: null,
@@ -435,6 +492,7 @@ function clearEngineState() {
 module.exports = {
   runAgent,
   runAgentStream,
+  resolveTools,
   setHooks,
   checkTokenBudget,
   getToolStatusMessage,
