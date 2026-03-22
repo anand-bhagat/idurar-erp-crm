@@ -7,12 +7,25 @@ const config = require('../config');
 describe('config', () => {
   it('should have LLM settings with defaults', () => {
     expect(config.llm).toBeDefined();
-    expect(config.llm.provider).toBe('openai');
+    expect(config.llm.provider).toBe('openai-compatible');
+    expect(config.llm.baseUrl).toBe('https://api.deepinfra.com/v1/openai');
+    expect(config.llm.model).toBe('zhipu-ai/glm-4.7-flash');
     expect(config.llm.maxIterations).toBe(10);
-    expect(config.llm.temperature).toBe(0.2);
+    expect(config.llm.temperature).toBe(0);
     expect(config.llm.maxTokens).toBe(4096);
     expect(config.llm.streaming).toBe(true);
     expect(config.llm.timeout).toBe(30000);
+    expect(config.llm.maxRetries).toBe(2);
+    expect(config.llm.tokenBudgetPerConversation).toBe(100000);
+  });
+
+  it('should have cost tracking pricing table', () => {
+    expect(config.llm.costTracking.enabled).toBe(true);
+    expect(config.llm.costTracking.pricing).toBeDefined();
+    expect(config.llm.costTracking.pricing['gpt-4o']).toBeDefined();
+    expect(config.llm.costTracking.pricing['gpt-4o'].input).toBe(2.5);
+    expect(config.llm.costTracking.pricing['claude-sonnet-4-20250514']).toBeDefined();
+    expect(config.llm.costTracking.pricing['zhipu-ai/glm-4.7-flash']).toBeDefined();
   });
 
   it('should have routing settings', () => {

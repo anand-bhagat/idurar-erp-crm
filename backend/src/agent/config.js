@@ -7,15 +7,28 @@
 
 const config = {
   llm: {
-    provider: process.env.AGENT_LLM_PROVIDER || 'openai',
-    model: process.env.AGENT_LLM_MODEL || 'gpt-4o-mini',
-    temperature: parseFloat(process.env.AGENT_LLM_TEMPERATURE) || 0.2,
+    // Provider: 'openai-compatible' or 'anthropic'
+    provider: process.env.AGENT_LLM_PROVIDER || 'openai-compatible',
+    baseUrl: process.env.AGENT_LLM_BASE_URL || 'https://api.deepinfra.com/v1/openai',
+    model: (process.env.AGENT_LLM_MODEL || 'zhipu-ai/glm-4.7-flash').toLowerCase(),
+    apiKey: process.env.AGENT_LLM_API_KEY,
+    temperature: parseFloat(process.env.AGENT_LLM_TEMPERATURE) || 0,
     maxTokens: parseInt(process.env.AGENT_LLM_MAX_TOKENS, 10) || 4096,
     streaming: process.env.AGENT_LLM_STREAMING !== 'false',
     timeout: parseInt(process.env.AGENT_LLM_TIMEOUT, 10) || 30000,
     maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS, 10) || 10,
+    maxRetries: parseInt(process.env.AGENT_LLM_MAX_RETRIES, 10) || 2,
+    tokenBudgetPerConversation: parseInt(process.env.AGENT_TOKEN_BUDGET, 10) || 100000,
     costTracking: {
       enabled: process.env.AGENT_COST_TRACKING !== 'false',
+      pricing: {
+        'claude-sonnet-4-20250514': { input: 3.0, output: 15.0, cached: 0.3 },
+        'claude-haiku-4-5-20251001': { input: 1.0, output: 5.0, cached: 0.1 },
+        'gpt-4o': { input: 2.5, output: 10.0, cached: 1.25 },
+        'gpt-4o-mini': { input: 0.15, output: 0.6, cached: 0.075 },
+        'zhipu-ai/glm-4.7-flash': { input: 0.06, output: 0.40, cached: 0.03 },
+        'llama-3.3-70b-versatile': { input: 0.59, output: 0.79, cached: 0.30 },
+      },
     },
   },
 

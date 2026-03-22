@@ -10,10 +10,14 @@ const { randomUUID } = require('crypto');
 const rateLimit = require('express-rate-limit');
 
 const agentAuth = require('@/agent/middleware/agent-auth');
-const { runAgent, runAgentStream, setHooks } = require('@/agent/engine');
+const { runAgent, runAgentStream, setHooks, resolveTools } = require('@/agent/engine');
 const registry = require('@/agent/registry');
 const config = require('@/agent/config');
 const observability = require('@/agent/observability');
+const { getLLMAdapter } = require('@/agent/llm');
+const { buildSystemPrompt } = require('@/agent/llm/prompt-builder');
+const { trackUsage } = require('@/agent/llm/cost-tracker');
+const Conversation = require('@/models/agentModels/Conversation');
 
 // Wire observability hooks into the engine on startup
 setHooks(observability.createHooks());
@@ -39,7 +43,8 @@ const agentRateLimiter = rateLimit({
  */
 router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
   const traceId = randomUUID();
-  const { message, frontendResult, conversationId = randomUUID() } = req.body;
+  const { message, frontendResult } = req.body;
+  let { conversationId } = req.body;
 
   // Validate request body
   if (!message && !frontendResult) {
@@ -50,14 +55,49 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
     });
   }
 
+  // Load or create conversation
+  let conversation;
+  if (conversationId) {
+    conversation = await Conversation.getConversation(conversationId);
+  }
+  if (!conversation) {
+    conversation = await Conversation.createConversation(req.agentContext.userId);
+    conversationId = conversation._id.toString();
+  }
+
   const userContext = {
     ...req.agentContext,
     traceId,
     conversationId,
   };
 
-  // Get tools based on user role
-  const tools = registry.getToolDefinitions(userContext.role);
+  // Get adapter
+  const adapter = getAdapter();
+
+  // Resolve tools (uses router if enabled, otherwise all role-permitted tools)
+  const resolveResult = await resolveTools(message, userContext, [], adapter);
+  const tools = resolveResult.tools;
+
+  // Build system prompt with conditional rules
+  const systemPrompt = buildSystemPrompt({
+    userContext: { name: userContext.name, role: userContext.role },
+    toolDefinitions: tools,
+  });
+
+  // Load conversation history and prepend system prompt
+  const history = await Conversation.getHistory(conversationId);
+  const conversationHistory = [{ role: 'system', content: systemPrompt }, ...history];
+
+  // Wire cost tracking into LLM hook
+  const existingHooks = observability.createHooks();
+  const originalOnLLMCall = existingHooks.onLLMCall;
+  existingHooks.onLLMCall = (data) => {
+    if (config.llm.costTracking.enabled && data.usage) {
+      trackUsage(data.usage, config.llm.model);
+    }
+    if (originalOnLLMCall) originalOnLLMCall(data);
+  };
+  setHooks(existingHooks);
 
   // Check if streaming is requested
   const useStreaming = req.headers.accept === 'text/event-stream' || req.query.stream === 'true';
@@ -81,12 +121,19 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
       await runAgentStream({
         message,
         frontendResult,
-        conversationHistory: [], // TODO: Load from conversation store
+        conversationHistory,
         userContext,
-        adapter: getAdapter(),
+        adapter,
         tools,
         res,
       });
+
+      // Save new messages to conversation
+      const newMessages = [];
+      if (message) newMessages.push({ role: 'user', content: message });
+      if (newMessages.length > 0) {
+        await Conversation.appendMessages(conversationId, newMessages);
+      }
     } catch (error) {
       res.write(`data: ${JSON.stringify({ type: 'error', message: 'An unexpected error occurred.' })}\n\n`);
       res.write(`data: ${JSON.stringify({ type: 'done', conversationId })}\n\n`);
@@ -99,11 +146,19 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
       const result = await runAgent({
         message,
         frontendResult,
-        conversationHistory: [], // TODO: Load from conversation store
+        conversationHistory,
         userContext,
-        adapter: getAdapter(),
+        adapter,
         tools,
       });
+
+      // Save messages to conversation
+      const newMessages = [];
+      if (message) newMessages.push({ role: 'user', content: message });
+      if (result.message) newMessages.push({ role: 'assistant', content: result.message });
+      if (newMessages.length > 0) {
+        await Conversation.appendMessages(conversationId, newMessages);
+      }
 
       return res.json({
         success: true,
@@ -144,21 +199,11 @@ router.get('/agent/metrics', agentAuth, (req, res) => {
 });
 
 /**
- * Get the LLM adapter.
- * Returns a placeholder — will be wired to real adapter in LLM phase.
+ * Get the LLM adapter instance.
+ * Uses the adapter factory — provider is determined by config/env.
  */
 function getAdapter() {
-  // Placeholder adapter that returns a simple response
-  // Will be replaced when LLM adapter layer is implemented (Phase 8)
-  return {
-    async chat(messages, tools, options) {
-      return {
-        content: 'The agent LLM adapter is not yet configured. Please set up the LLM adapter layer.',
-        toolCalls: null,
-        usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0 },
-      };
-    },
-  };
+  return getLLMAdapter(config.llm);
 }
 
 module.exports = router;
