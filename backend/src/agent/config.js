@@ -26,10 +26,6 @@ const config = {
     cacheMessages: parseInt(process.env.AGENT_ROUTING_CACHE_MESSAGES, 10) || 5,
   },
 
-  tokenBudget: {
-    perConversation: parseInt(process.env.AGENT_TOKEN_BUDGET, 10) || 100000,
-  },
-
   features: {
     enabledCategories: process.env.AGENT_ENABLED_CATEGORIES
       ? process.env.AGENT_ENABLED_CATEGORIES.split(',').map((s) => s.trim())
@@ -48,8 +44,35 @@ const config = {
 
   guardrails: {
     circuitBreaker: {
+      enabled: process.env.AGENT_CIRCUIT_BREAKER_ENABLED !== 'false',
       threshold: parseInt(process.env.AGENT_CIRCUIT_BREAKER_THRESHOLD, 10) || 5,
       resetMs: parseInt(process.env.AGENT_CIRCUIT_BREAKER_RESET, 10) || 60000,
+    },
+    sanitization: {
+      enabled: process.env.AGENT_SANITIZATION_ENABLED !== 'false',
+    },
+    injectionDetection: {
+      enabled: process.env.AGENT_INJECTION_DETECTION_ENABLED !== 'false',
+      mode: process.env.AGENT_INJECTION_DETECTION_MODE || 'flag', // 'block' or 'flag'
+    },
+    rateLimiting: {
+      enabled: process.env.AGENT_GUARDRAIL_RATE_LIMIT_ENABLED !== 'false',
+      perUser: {
+        windowMs: parseInt(process.env.AGENT_RATE_LIMIT_USER_WINDOW, 10) || 60000,
+        maxRequests: parseInt(process.env.AGENT_RATE_LIMIT_USER_MAX, 10) || 30,
+      },
+      perConversation: {
+        windowMs: parseInt(process.env.AGENT_RATE_LIMIT_CONV_WINDOW, 10) || 60000,
+        maxRequests: parseInt(process.env.AGENT_RATE_LIMIT_CONV_MAX, 10) || 15,
+      },
+      perTool: {
+        windowMs: parseInt(process.env.AGENT_RATE_LIMIT_TOOL_WINDOW, 10) || 60000,
+        maxRequests: parseInt(process.env.AGENT_RATE_LIMIT_TOOL_MAX, 10) || 20,
+      },
+    },
+    tokenBudget: {
+      enabled: process.env.AGENT_TOKEN_BUDGET_ENABLED !== 'false',
+      perConversation: parseInt(process.env.AGENT_TOKEN_BUDGET, 10) || 100000,
     },
     cacheTTL: parseInt(process.env.AGENT_CACHE_TTL, 10) || 30000,
   },

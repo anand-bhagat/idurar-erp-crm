@@ -22,8 +22,9 @@ describe('config', () => {
     expect(Array.isArray(config.routing.coreCategories)).toBe(true);
   });
 
-  it('should have token budget', () => {
-    expect(config.tokenBudget.perConversation).toBe(100000);
+  it('should have token budget in guardrails', () => {
+    expect(config.guardrails.tokenBudget.perConversation).toBe(100000);
+    expect(config.guardrails.tokenBudget.enabled).toBe(true);
   });
 
   it('should have rate limiting settings', () => {
@@ -37,8 +38,16 @@ describe('config', () => {
   });
 
   it('should have guardrails settings', () => {
+    expect(config.guardrails.circuitBreaker.enabled).toBe(true);
     expect(config.guardrails.circuitBreaker.threshold).toBe(5);
     expect(config.guardrails.circuitBreaker.resetMs).toBe(60000);
+    expect(config.guardrails.sanitization.enabled).toBe(true);
+    expect(config.guardrails.injectionDetection.enabled).toBe(true);
+    expect(config.guardrails.injectionDetection.mode).toBe('flag');
+    expect(config.guardrails.rateLimiting.enabled).toBe(true);
+    expect(config.guardrails.rateLimiting.perUser.maxRequests).toBe(30);
+    expect(config.guardrails.rateLimiting.perConversation.maxRequests).toBe(15);
+    expect(config.guardrails.rateLimiting.perTool.maxRequests).toBe(20);
     expect(config.guardrails.cacheTTL).toBe(30000);
   });
 

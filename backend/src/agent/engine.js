@@ -8,6 +8,7 @@
 const registry = require('./registry');
 const config = require('./config');
 const router = require('./router');
+const { sanitizer, injectionDetector, rateLimiter, tokenBudget, circuitBreaker } = require('./guardrails');
 
 /**
  * Tool status messages for SSE events.
@@ -46,57 +47,15 @@ function setHooks(newHooks) {
 }
 
 /**
- * Per-conversation token usage tracking.
- */
-const conversationTokenUsage = new Map();
-
-/**
- * Circuit breaker state.
- */
-const toolFailureCounts = new Map();
-
-function isToolCircuitOpen(toolName) {
-  const record = toolFailureCounts.get(toolName);
-  if (!record) return false;
-  if (record.count >= config.guardrails.circuitBreaker.threshold) {
-    if (Date.now() - record.lastFailure > config.guardrails.circuitBreaker.resetMs) {
-      toolFailureCounts.delete(toolName);
-      return false;
-    }
-    return true;
-  }
-  return false;
-}
-
-function recordToolFailure(toolName) {
-  const record = toolFailureCounts.get(toolName) || { count: 0, lastFailure: 0 };
-  record.count++;
-  record.lastFailure = Date.now();
-  toolFailureCounts.set(toolName, record);
-}
-
-function recordToolSuccess(toolName) {
-  toolFailureCounts.delete(toolName);
-}
-
-/**
- * Check if conversation is within token budget.
+ * Delegate to guardrail modules for token budget and circuit breaker.
+ * These thin wrappers maintain the engine's existing API.
  */
 function checkTokenBudget(conversationId, newUsage = 0) {
-  const total = (conversationTokenUsage.get(conversationId) || 0) + newUsage;
-  if (total > config.tokenBudget.perConversation) {
-    return {
-      allowed: false,
-      error: 'This conversation has reached its processing limit. Please start a new conversation.',
-    };
-  }
-  return { allowed: true };
+  return tokenBudget.checkBudget(conversationId, newUsage);
 }
 
 function trackTokenUsage(conversationId, usage) {
-  const total = (conversationTokenUsage.get(conversationId) || 0) +
-    (usage.inputTokens || 0) + (usage.outputTokens || 0);
-  conversationTokenUsage.set(conversationId, total);
+  tokenBudget.trackUsage(conversationId, usage);
 }
 
 /**
@@ -122,17 +81,30 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
   const MAX_ITERATIONS = config.llm.maxIterations;
   const conversationId = userContext.conversationId;
 
-  // Check token budget
+  // Rate limiting check
+  const rateCheck = rateLimiter.checkAllLimits(userContext);
+  if (!rateCheck.allowed) {
+    return { type: 'response', message: rateCheck.error };
+  }
+
+  // Token budget check
   const budgetCheck = checkTokenBudget(conversationId);
   if (!budgetCheck.allowed) {
     return { type: 'response', message: budgetCheck.error };
+  }
+
+  // Prompt injection detection (only for new user messages)
+  if (message) {
+    const injectionCheck = injectionDetector.checkMessage(message, hooks.onGuardrailCheck, userContext);
+    if (!injectionCheck.allowed) {
+      return { type: 'response', message: injectionCheck.reason };
+    }
   }
 
   // Build messages array
   let messages = [...conversationHistory];
 
   if (frontendResult) {
-    // Continue from a frontend tool execution
     messages.push({
       role: 'tool',
       tool_call_id: frontendResult.toolCallId,
@@ -180,7 +152,6 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
 
     // If LLM wants to call tools
     if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {
-      // Add assistant message with tool calls to history
       messages.push({
         role: 'assistant',
         content: llmResponse.content || null,
@@ -193,7 +164,7 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
 
       for (const toolCall of llmResponse.toolCalls) {
         // Circuit breaker check
-        if (isToolCircuitOpen(toolCall.name)) {
+        if (circuitBreaker.isOpen(toolCall.name)) {
           const circuitError = {
             success: false,
             error: `Tool "${toolCall.name}" is temporarily unavailable. Please try again later.`,
@@ -207,7 +178,22 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
           continue;
         }
 
-        // Guardrail hook
+        // Per-tool rate limit check
+        const toolRateCheck = rateLimiter.checkToolLimit(toolCall.name, userContext.userId);
+        if (!toolRateCheck.allowed) {
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify({
+              success: false,
+              error: toolRateCheck.error,
+              code: 'RATE_LIMITED',
+            }),
+          });
+          continue;
+        }
+
+        // Guardrail hook (custom, set by API layer)
         if (hooks.onGuardrailCheck) {
           const guardrailResult = await hooks.onGuardrailCheck(toolCall.name, toolCall.params, userContext);
           if (guardrailResult && !guardrailResult.allowed) {
@@ -230,9 +216,9 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
 
         // Track success/failure for circuit breaker
         if (result.success === false && result.code === 'INTERNAL_ERROR') {
-          recordToolFailure(toolCall.name);
+          circuitBreaker.recordFailure(toolCall.name);
         } else if (result.success !== false) {
-          recordToolSuccess(toolCall.name);
+          circuitBreaker.recordSuccess(toolCall.name);
         }
 
         // Observability hook
@@ -251,10 +237,15 @@ async function runAgent({ message, frontendResult, conversationHistory, userCont
           return { ...result, toolCallId: toolCall.id };
         }
 
+        // Sanitize tool result before feeding back to LLM
+        const toolDef = registry.getTool(toolCall.name);
+        const category = toolDef ? toolDef.category : undefined;
+        const sanitizedResult = sanitizer.sanitizeToolResult(result, toolCall.name, category);
+
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
-          content: JSON.stringify(result),
+          content: JSON.stringify(sanitizedResult),
         });
       }
       continue; // Loop — LLM may need more tools
@@ -287,12 +278,30 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   }
 
+  // Rate limiting check
+  const rateCheck = rateLimiter.checkAllLimits(userContext);
+  if (!rateCheck.allowed) {
+    sendSSE({ type: 'error', message: rateCheck.error });
+    sendSSE({ type: 'done', conversationId });
+    return;
+  }
+
   // Check token budget
   const budgetCheck = checkTokenBudget(conversationId);
   if (!budgetCheck.allowed) {
     sendSSE({ type: 'error', message: budgetCheck.error });
     sendSSE({ type: 'done', conversationId });
     return;
+  }
+
+  // Prompt injection detection
+  if (message) {
+    const injectionCheck = injectionDetector.checkMessage(message, hooks.onGuardrailCheck, userContext);
+    if (!injectionCheck.allowed) {
+      sendSSE({ type: 'error', message: injectionCheck.reason });
+      sendSSE({ type: 'done', conversationId });
+      return;
+    }
   }
 
   // Build messages array
@@ -357,7 +366,7 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
       });
 
       for (const toolCall of llmResponse.toolCalls) {
-        if (isToolCircuitOpen(toolCall.name)) {
+        if (circuitBreaker.isOpen(toolCall.name)) {
           const circuitError = {
             success: false,
             error: `Tool "${toolCall.name}" is temporarily unavailable.`,
@@ -378,9 +387,9 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
         const toolDuration = Date.now() - toolStart;
 
         if (result.success === false && result.code === 'INTERNAL_ERROR') {
-          recordToolFailure(toolCall.name);
+          circuitBreaker.recordFailure(toolCall.name);
         } else if (result.success !== false) {
-          recordToolSuccess(toolCall.name);
+          circuitBreaker.recordSuccess(toolCall.name);
         }
 
         if (hooks.onToolExecution) {
@@ -399,10 +408,15 @@ async function runAgentStream({ message, frontendResult, conversationHistory, us
           return;
         }
 
+        // Sanitize tool result before feeding back to LLM
+        const toolDef = registry.getTool(toolCall.name);
+        const category = toolDef ? toolDef.category : undefined;
+        const sanitizedResult = sanitizer.sanitizeToolResult(result, toolCall.name, category);
+
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
-          content: JSON.stringify(result),
+          content: JSON.stringify(sanitizedResult),
         });
       }
 
@@ -478,8 +492,9 @@ async function resolveTools(message, userContext, conversationHistory, adapter) 
  * Clear engine state (for testing).
  */
 function clearEngineState() {
-  conversationTokenUsage.clear();
-  toolFailureCounts.clear();
+  tokenBudget.clearAll();
+  circuitBreaker.clearAll();
+  rateLimiter.clearLimits();
   router.clearCache();
   hooks = {
     onToolExecution: null,
@@ -498,6 +513,7 @@ module.exports = {
   getToolStatusMessage,
   clearEngineState,
   // Exposed for testing
-  _toolFailureCounts: toolFailureCounts,
-  _conversationTokenUsage: conversationTokenUsage,
+  _tokenBudget: tokenBudget,
+  _circuitBreaker: circuitBreaker,
+  _rateLimiter: rateLimiter,
 };

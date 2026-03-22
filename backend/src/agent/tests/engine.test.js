@@ -2,7 +2,7 @@
  * Tests for agent/engine.js
  */
 
-const { runAgent, checkTokenBudget, getToolStatusMessage, clearEngineState, setHooks, _toolFailureCounts, _conversationTokenUsage } = require('../engine');
+const { runAgent, checkTokenBudget, getToolStatusMessage, clearEngineState, setHooks, _tokenBudget, _circuitBreaker } = require('../engine');
 const registry = require('../registry');
 const { MockLLMAdapter } = require('./helpers/mockAdapter');
 const { mockContext } = require('./helpers/mockContext');
@@ -213,7 +213,7 @@ describe('engine', () => {
     });
 
     it('should reject requests that exceed budget', () => {
-      _conversationTokenUsage.set('conv-over', 200000);
+      _tokenBudget._conversationTokenUsage.set('conv-over', 200000);
       const result = checkTokenBudget('conv-over');
       expect(result.allowed).toBe(false);
       expect(result.error).toContain('limit');
@@ -235,7 +235,7 @@ describe('engine', () => {
         tools,
       });
 
-      const usage = _conversationTokenUsage.get(ctx.conversationId);
+      const usage = _tokenBudget._conversationTokenUsage.get(ctx.conversationId);
       expect(usage).toBe(60000);
     });
   });
@@ -275,8 +275,8 @@ describe('engine', () => {
       });
 
       // After 5+ failures, the circuit should be open
-      const record = _toolFailureCounts.get('flaky_tool');
-      expect(record.count).toBeGreaterThanOrEqual(5);
+      const state = _circuitBreaker.getState('flaky_tool');
+      expect(state).toBe('open');
     });
   });
 
