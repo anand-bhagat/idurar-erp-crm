@@ -21,6 +21,7 @@ import AppRouter from '@/router/AppRouter';
 import useResponsive from '@/hooks/useResponsive';
 
 import storePersist from '@/redux/storePersist';
+import AgentChat from '@/components/AgentChat/AgentChat';
 
 export default function ErpCrmApp() {
   const { Content } = Layout;
@@ -84,6 +85,8 @@ export default function ErpCrmApp() {
             </Content>
           </Layout>
         )}
+
+        <AgentChat />
       </Layout>
     );
   else return <PageLoader />;
