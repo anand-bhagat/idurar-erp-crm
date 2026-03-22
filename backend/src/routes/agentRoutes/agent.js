@@ -135,6 +135,7 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
         await Conversation.appendMessages(conversationId, newMessages);
       }
     } catch (error) {
+      console.error(`[agent:chat] SSE error traceId=${traceId} conversationId=${conversationId}`, error);
       res.write(`data: ${JSON.stringify({ type: 'error', message: 'An unexpected error occurred.' })}\n\n`);
       res.write(`data: ${JSON.stringify({ type: 'done', conversationId })}\n\n`);
     }
@@ -167,6 +168,7 @@ router.post('/agent/chat', agentAuth, agentRateLimiter, async (req, res) => {
         traceId,
       });
     } catch (error) {
+      console.error(`[agent:chat] JSON error traceId=${traceId} conversationId=${conversationId}`, error);
       return res.status(500).json({
         success: false,
         error: 'An unexpected error occurred processing your request.',

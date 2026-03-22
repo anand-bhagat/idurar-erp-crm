@@ -36,8 +36,6 @@ export default function DashboardModule() {
     onFetch: fetchInvoicesStats,
   } = useOnFetch();
 
-  const { result: quoteResult, isLoading: quoteLoading, onFetch: fetchQuotesStats } = useOnFetch();
-
   const {
     result: paymentResult,
     isLoading: paymentLoading,
@@ -53,8 +51,7 @@ export default function DashboardModule() {
 
     if (currency) {
       fetchInvoicesStats(getStatsData({ entity: 'invoice', currency }));
-      fetchQuotesStats(getStatsData({ entity: 'quote', currency }));
-      fetchPayemntsStats(getStatsData({ entity: 'payment', currency }));
+fetchPayemntsStats(getStatsData({ entity: 'payment', currency }));
     }
   }, [money_format_settings.default_currency_code]);
 
@@ -95,12 +92,6 @@ export default function DashboardModule() {
       entity: 'invoice',
       title: translate('Invoices'),
     },
-    {
-      result: quoteResult,
-      isLoading: quoteLoading,
-      entity: 'quote',
-      title: translate('quote'),
-    },
   ];
 
   const statisticCards = entityData.map((data, index) => {
@@ -133,12 +124,6 @@ export default function DashboardModule() {
             prefix={translate('This month')}
             isLoading={invoiceLoading}
             data={invoiceResult?.total}
-          />
-          <SummaryCard
-            title={translate('Quote')}
-            prefix={translate('This month')}
-            isLoading={quoteLoading}
-            data={quoteResult?.total}
           />
           <SummaryCard
             title={translate('paid')}
@@ -182,14 +167,6 @@ export default function DashboardModule() {
             </div>
           </Col>
 
-          <Col className="gutter-row w-full" sm={{ span: 24 }} lg={{ span: 12 }}>
-            <div className="whiteBox shadow pad20" style={{ height: '100%' }}>
-              <h3 style={{ color: '#22075e', marginBottom: 5, padding: '0 20px 20px' }}>
-                {translate('Recent Quotes')}
-              </h3>
-              <RecentTable entity={'quote'} dataTableColumns={dataTableColumns} />
-            </div>
-          </Col>
         </Row>
       </>
     );

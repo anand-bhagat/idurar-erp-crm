@@ -171,16 +171,6 @@ export default function ReadItem({ config, selectedItem }) {
           >
             {translate('Send by Email')}
           </Button>,
-          <Button
-            key={`${uniqueId()}`}
-            onClick={() => {
-              dispatch(erp.convert({ entity, id: currentErp._id }));
-            }}
-            icon={<RetweetOutlined />}
-            style={{ display: entity === 'quote' ? 'inline-block' : 'none' }}
-          >
-            {translate('Convert to Invoice')}
-          </Button>,
 
           <Button
             key={`${uniqueId()}`}
