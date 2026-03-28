@@ -50,22 +50,31 @@ const CATEGORY_BLOCKED_FIELDS = {
  * @param {Set} blockedFields - Set of field names to strip
  * @returns {*} Sanitized data
  */
-function stripFields(data, blockedFields) {
+function stripFields(data, blockedFields, seen = new WeakSet()) {
   if (data === null || data === undefined) return data;
+  if (typeof data !== 'object') return data;
+
+  // Convert Mongoose documents to plain objects to avoid circular refs
+  if (typeof data.toJSON === 'function') {
+    data = data.toJSON();
+    if (typeof data !== 'object' || data === null) return data;
+  }
+
+  if (seen.has(data)) return '[Circular]';
+  seen.add(data);
+
   if (Array.isArray(data)) {
-    return data.map((item) => stripFields(item, blockedFields));
+    return data.map((item) => stripFields(item, blockedFields, seen));
   }
-  if (typeof data === 'object') {
-    const cleaned = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (blockedFields.has(key) || GLOBAL_BLOCKED_FIELDS.has(key)) {
-        continue; // Strip this field entirely
-      }
-      cleaned[key] = stripFields(value, blockedFields);
+
+  const cleaned = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (blockedFields.has(key) || GLOBAL_BLOCKED_FIELDS.has(key)) {
+      continue; // Strip this field entirely
     }
-    return cleaned;
+    cleaned[key] = stripFields(value, blockedFields, seen);
   }
-  return data;
+  return cleaned;
 }
 
 /**
@@ -74,7 +83,7 @@ function stripFields(data, blockedFields) {
  * @param {*} data - Data to scan
  * @returns {*} Data with PII redacted
  */
-function redactPII(data) {
+function redactPII(data, seen = new WeakSet()) {
   if (data === null || data === undefined) return data;
   if (typeof data === 'string') {
     let result = data;
@@ -83,17 +92,24 @@ function redactPII(data) {
     }
     return result;
   }
+  if (typeof data !== 'object') return data;
+
+  if (typeof data.toJSON === 'function') {
+    data = data.toJSON();
+    if (typeof data !== 'object' || data === null) return data;
+  }
+
+  if (seen.has(data)) return '[Circular]';
+  seen.add(data);
+
   if (Array.isArray(data)) {
-    return data.map((item) => redactPII(item));
+    return data.map((item) => redactPII(item, seen));
   }
-  if (typeof data === 'object') {
-    const cleaned = {};
-    for (const [key, value] of Object.entries(data)) {
-      cleaned[key] = redactPII(value);
-    }
-    return cleaned;
+  const cleaned = {};
+  for (const [key, value] of Object.entries(data)) {
+    cleaned[key] = redactPII(value, seen);
   }
-  return data;
+  return cleaned;
 }
 
 /**

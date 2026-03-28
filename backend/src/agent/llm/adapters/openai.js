@@ -143,7 +143,11 @@ class OpenAICompatibleAdapter extends BaseLLMAdapter {
           content: msg.content,
         };
       }
-      return { role: msg.role, content: msg.content };
+      const converted = { role: msg.role, content: msg.content };
+      if (msg.tool_calls) {
+        converted.tool_calls = msg.tool_calls;
+      }
+      return converted;
     });
   }
 }

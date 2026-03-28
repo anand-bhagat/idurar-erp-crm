@@ -595,48 +595,41 @@ describe('router', () => {
       expect(result.categories).toContain('clients');
     });
 
-    it('should return cached tools on subsequent calls (same conversation)', async () => {
-      adapter.setNextResponse({
-        content: '["clients"]',
-        toolCalls: null,
-        usage: { inputTokens: 100, outputTokens: 10 },
-      });
+    it('should route fresh on every call (no caching)', async () => {
+      adapter.setNextResponses([
+        { content: '["clients"]', toolCalls: null, usage: { inputTokens: 100, outputTokens: 10 } },
+        { content: '["clients"]', toolCalls: null, usage: { inputTokens: 100, outputTokens: 10 } },
+      ]);
 
       // First call — routes
       await router.getToolsForMessage('Show clients', 'conv-1', [], 'owner', adapter);
 
-      // Second call — should be cached (no new adapter call)
+      // Second call — routes again (no caching)
       const result = await router.getToolsForMessage('How many clients?', 'conv-1', [], 'owner', adapter);
 
-      expect(result.cached).toBe(true);
+      expect(result.cached).toBe(false);
       expect(result.categories).toContain('clients');
-      // Adapter should only have been called once
-      expect(adapter.getCalls()).toHaveLength(1);
+      // Adapter should have been called twice (once per message)
+      expect(adapter.getCalls()).toHaveLength(2);
     });
 
-    it('should re-route after cacheMessages threshold', async () => {
-      const savedCacheMessages = config.routing.cacheMessages;
-      config.routing.cacheMessages = 3;
-
+    it('should route fresh on every call regardless of message count', async () => {
       adapter.setNextResponses([
+        { content: '["clients"]', toolCalls: null, usage: { inputTokens: 100, outputTokens: 10 } },
+        { content: '["clients"]', toolCalls: null, usage: { inputTokens: 100, outputTokens: 10 } },
         { content: '["clients"]', toolCalls: null, usage: { inputTokens: 100, outputTokens: 10 } },
         { content: '["invoices"]', toolCalls: null, usage: { inputTokens: 100, outputTokens: 10 } },
       ]);
 
-      // Call 1 — routes (messageCount = 1)
       await router.getToolsForMessage('msg1', 'conv-2', [], 'owner', adapter);
-      // Call 2 — cached (messageCount = 2)
       await router.getToolsForMessage('msg2', 'conv-2', [], 'owner', adapter);
-      // Call 3 — cached (messageCount = 3)
       await router.getToolsForMessage('msg3', 'conv-2', [], 'owner', adapter);
-      // Call 4 — should re-route (messageCount >= 3)
       const result = await router.getToolsForMessage('msg4', 'conv-2', [], 'owner', adapter);
 
       expect(result.cached).toBe(false);
       expect(result.categories).toContain('invoices');
-      expect(adapter.getCalls()).toHaveLength(2);
-
-      config.routing.cacheMessages = savedCacheMessages;
+      // Every call routes — 4 adapter calls total
+      expect(adapter.getCalls()).toHaveLength(4);
     });
 
     it('should use separate caches for different conversations', async () => {
@@ -789,28 +782,26 @@ describe('router', () => {
       expect(toolNames).not.toContain('get_payment');
     });
 
-    it('should keep stable tool list across multiple messages (via cache)', async () => {
+    it('should route fresh on each message and return consistent results for same category', async () => {
       config.routing.enabled = true;
       config.routing.threshold = 5;
 
-      adapter.setNextResponse({
-        content: '["clients"]',
-        toolCalls: null,
-        usage: { inputTokens: 100, outputTokens: 10 },
-      });
+      adapter.setNextResponses([
+        { content: '["clients"]', toolCalls: null, usage: { inputTokens: 100, outputTokens: 10 } },
+        { content: '["clients"]', toolCalls: null, usage: { inputTokens: 100, outputTokens: 10 } },
+      ]);
 
       const ctx = mockContext();
 
-      // First message — routes
+      // Both messages route to same category — should get same tool count
       const result1 = await resolveTools('Show clients', ctx, [], adapter);
-      // Second message — cached
       const result2 = await resolveTools('How many clients?', ctx, [], adapter);
 
-      // Same tool list both times
+      // Same tool list both times (same category selected)
       expect(result1.tools.length).toBe(result2.tools.length);
-      expect(result2.cached).toBe(true);
-      // Only 1 adapter call
-      expect(adapter.getCalls()).toHaveLength(1);
+      expect(result2.cached).toBe(false);
+      // Both calls route fresh
+      expect(adapter.getCalls()).toHaveLength(2);
     });
 
     it('should fall back gracefully on router error', async () => {

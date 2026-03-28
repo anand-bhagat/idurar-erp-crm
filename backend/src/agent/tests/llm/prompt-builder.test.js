@@ -42,8 +42,8 @@ describe('buildSystemPrompt', () => {
 
   it('should include tool usage rules', () => {
     const prompt = buildSystemPrompt(baseOptions);
-    expect(prompt).toContain('ALWAYS use tools to get data');
-    expect(prompt).toContain('NEVER make up information');
+    expect(prompt).toContain('MUST call tools to retrieve any data');
+    expect(prompt).toContain('Do NOT invent data');
   });
 
   it('should include user context', () => {

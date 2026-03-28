@@ -2,8 +2,6 @@
  * Tests for Observability — Logger and Metrics
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
-const assert = require('node:assert/strict');
 
 const logger = require('../observability/logger');
 const metrics = require('../observability/metrics');
@@ -57,19 +55,19 @@ describe('Logger', () => {
       const ctx = mockContext();
       logger.logToolExecution('search_clients', { keyword: 'acme' }, ctx, { success: true }, 45);
 
-      assert.equal(logs.length, 1);
+      expect(logs.length).toBe(1);
       const log = logs[0];
-      assert.equal(log.type, 'tool_execution');
-      assert.equal(log.traceId, 'trace-abc');
-      assert.equal(log.conversationId, 'conv-456');
-      assert.equal(log.tool, 'search_clients');
-      assert.equal(log.userId, 'user-123');
-      assert.equal(log.role, 'owner');
-      assert.equal(log.success, true);
-      assert.equal(log.errorCode, null);
-      assert.equal(log.durationMs, 45);
-      assert.equal(log.level, 'info');
-      assert.ok(log.timestamp);
+      expect(log.type).toBe('tool_execution');
+      expect(log.traceId).toBe('trace-abc');
+      expect(log.conversationId).toBe('conv-456');
+      expect(log.tool).toBe('search_clients');
+      expect(log.userId).toBe('user-123');
+      expect(log.role).toBe('owner');
+      expect(log.success).toBe(true);
+      expect(log.errorCode).toBe(null);
+      expect(log.durationMs).toBe(45);
+      expect(log.level).toBe('info');
+      expect(log.timestamp).toBeTruthy();
     });
 
     it('should log a failed tool execution with error code', () => {
@@ -83,8 +81,8 @@ describe('Logger', () => {
       );
 
       const log = logs[0];
-      assert.equal(log.success, false);
-      assert.equal(log.errorCode, 'NOT_FOUND');
+      expect(log.success).toBe(false);
+      expect(log.errorCode).toBe('NOT_FOUND');
     });
 
     it('should sanitize params — strip passwords and PII', () => {
@@ -98,9 +96,9 @@ describe('Logger', () => {
       );
 
       const log = logs[0];
-      assert.equal(log.params.password, undefined);
-      assert.equal(log.params.email, '[EMAIL_REDACTED]');
-      assert.equal(log.params.name, 'Test');
+      expect(log.params.password).toBe(undefined);
+      expect(log.params.email).toBe('[EMAIL_REDACTED]');
+      expect(log.params.name).toBe('Test');
     });
   });
 
@@ -116,17 +114,17 @@ describe('Logger', () => {
         { toolCallCount: 2, cost: 0.00035 }
       );
 
-      assert.equal(logs.length, 1);
+      expect(logs.length).toBe(1);
       const log = logs[0];
-      assert.equal(log.type, 'llm_call');
-      assert.equal(log.model, 'gpt-4o-mini');
-      assert.equal(log.inputTokens, 4200);
-      assert.equal(log.outputTokens, 350);
-      assert.equal(log.cachedTokens, 3800);
-      assert.equal(log.cacheHitRate, '90.5%');
-      assert.equal(log.toolCallCount, 2);
-      assert.equal(log.durationMs, 620);
-      assert.equal(log.cost, 0.00035);
+      expect(log.type).toBe('llm_call');
+      expect(log.model).toBe('gpt-4o-mini');
+      expect(log.inputTokens).toBe(4200);
+      expect(log.outputTokens).toBe(350);
+      expect(log.cachedTokens).toBe(3800);
+      expect(log.cacheHitRate).toBe('90.5%');
+      expect(log.toolCallCount).toBe(2);
+      expect(log.durationMs).toBe(620);
+      expect(log.cost).toBe(0.00035);
     });
 
     it('should handle zero input tokens gracefully', () => {
@@ -137,7 +135,7 @@ describe('Logger', () => {
         'trace-abc'
       );
 
-      assert.equal(logs[0].cacheHitRate, '0%');
+      expect(logs[0].cacheHitRate).toBe('0%');
     });
   });
 
@@ -151,12 +149,12 @@ describe('Logger', () => {
       });
 
       const log = logs[0];
-      assert.equal(log.type, 'router_call');
-      assert.deepEqual(log.selectedCategories, ['clients', 'invoices']);
-      assert.equal(log.toolCount, 17);
-      assert.equal(log.durationMs, 150);
-      assert.equal(log.cached, false);
-      assert.equal(log.fallback, false);
+      expect(log.type).toBe('router_call');
+      expect(log.selectedCategories).toEqual(['clients', 'invoices']);
+      expect(log.toolCount).toBe(17);
+      expect(log.durationMs).toBe(150);
+      expect(log.cached).toBe(false);
+      expect(log.fallback).toBe(false);
     });
   });
 
@@ -181,14 +179,14 @@ describe('Logger', () => {
       });
 
       const log = logs[0];
-      assert.equal(log.type, 'agent_request');
-      assert.equal(log.traceId, 'trace-abc');
-      assert.equal(log.conversationId, 'conv-456');
-      assert.equal(log.llmCalls, 3);
-      assert.equal(log.toolCalls, 2);
-      assert.deepEqual(log.tools, ['search_clients', 'get_client']);
-      assert.equal(log.cacheHitRate, '88.9%');
-      assert.equal(log.totalCost, 0.0012);
+      expect(log.type).toBe('agent_request');
+      expect(log.traceId).toBe('trace-abc');
+      expect(log.conversationId).toBe('conv-456');
+      expect(log.llmCalls).toBe(3);
+      expect(log.toolCalls).toBe(2);
+      expect(log.tools).toEqual(['search_clients', 'get_client']);
+      expect(log.cacheHitRate).toBe('88.9%');
+      expect(log.totalCost).toBe(0.0012);
     });
   });
 
@@ -198,33 +196,33 @@ describe('Logger', () => {
     it('should not emit debug logs when level is info', () => {
       config.observability.logLevel = 'info';
       logger.debug('test message');
-      assert.equal(logs.length, 0);
+      expect(logs.length).toBe(0);
     });
 
     it('should emit warn logs when level is info', () => {
       config.observability.logLevel = 'info';
       logger.warn('test warning');
-      assert.equal(logs.length, 1);
-      assert.equal(logs[0].level, 'warn');
+      expect(logs.length).toBe(1);
+      expect(logs[0].level).toBe('warn');
     });
 
     it('should emit debug logs when level is debug', () => {
       config.observability.logLevel = 'debug';
       logger.debug('test debug');
-      assert.equal(logs.length, 1);
-      assert.equal(logs[0].level, 'debug');
+      expect(logs.length).toBe(1);
+      expect(logs[0].level).toBe('debug');
     });
 
     it('should not emit info logs when level is error', () => {
       config.observability.logLevel = 'error';
       logger.logToolExecution('test', {}, mockContext(), { success: true }, 10);
-      assert.equal(logs.length, 0);
+      expect(logs.length).toBe(0);
     });
 
     it('should emit error logs at any level', () => {
       config.observability.logLevel = 'error';
       logger.error('test error');
-      assert.equal(logs.length, 1);
+      expect(logs.length).toBe(1);
     });
   });
 
@@ -234,16 +232,16 @@ describe('Logger', () => {
     it('should log warn with custom context', () => {
       logger.warn('injection detected', { traceId: 'trace-1', pattern: 'role_override' });
       const log = logs[0];
-      assert.equal(log.type, 'warning');
-      assert.equal(log.message, 'injection detected');
-      assert.equal(log.pattern, 'role_override');
+      expect(log.type).toBe('warning');
+      expect(log.message).toBe('injection detected');
+      expect(log.pattern).toBe('role_override');
     });
 
     it('should log error with custom context', () => {
       logger.error('tool handler crashed', { tool: 'search_clients', traceId: 'trace-1' });
       const log = logs[0];
-      assert.equal(log.type, 'error');
-      assert.equal(log.level, 'error');
+      expect(log.type).toBe('error');
+      expect(log.level).toBe('error');
     });
   });
 });
@@ -266,8 +264,8 @@ describe('Metrics', () => {
       metrics.recordToolCall('get_client', 12, true);
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.tools['search_clients'].calls, 2);
-      assert.equal(summary.tools['get_client'].calls, 1);
+      expect(summary.tools['search_clients'].calls).toBe(2);
+      expect(summary.tools['get_client'].calls).toBe(1);
     });
 
     it('should record error rates', () => {
@@ -276,8 +274,8 @@ describe('Metrics', () => {
       metrics.recordToolCall('search_clients', 50, true);
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.tools['search_clients'].errors, 1);
-      assert.equal(summary.tools['search_clients'].errorRate, '33.3%');
+      expect(summary.tools['search_clients'].errors).toBe(1);
+      expect(summary.tools['search_clients'].errorRate).toBe('33.3%');
     });
 
     it('should track latency percentiles', () => {
@@ -287,9 +285,9 @@ describe('Metrics', () => {
       }
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.tools['test_tool'].latency.p50, 50);
-      assert.equal(summary.tools['test_tool'].latency.p95, 95);
-      assert.equal(summary.tools['test_tool'].latency.p99, 99);
+      expect(summary.tools['test_tool'].latency.p50).toBe(50);
+      expect(summary.tools['test_tool'].latency.p95).toBe(95);
+      expect(summary.tools['test_tool'].latency.p99).toBe(99);
     });
   });
 
@@ -301,18 +299,18 @@ describe('Metrics', () => {
       metrics.recordLLMCall({ inputTokens: 5000, outputTokens: 400, cachedTokens: 4500 }, 580, 0.0004);
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.llm.calls, 2);
-      assert.equal(summary.llm.totalInputTokens, 9200);
-      assert.equal(summary.llm.totalOutputTokens, 750);
-      assert.equal(summary.llm.totalCachedTokens, 8300);
-      assert.equal(summary.llm.totalCost, 0.00035 + 0.0004);
+      expect(summary.llm.calls).toBe(2);
+      expect(summary.llm.totalInputTokens).toBe(9200);
+      expect(summary.llm.totalOutputTokens).toBe(750);
+      expect(summary.llm.totalCachedTokens).toBe(8300);
+      expect(summary.llm.totalCost).toBe(0.00035 + 0.0004);
     });
 
     it('should calculate cache hit rate', () => {
       metrics.recordLLMCall({ inputTokens: 1000, outputTokens: 100, cachedTokens: 900 }, 100);
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.llm.cacheHitRate, '90.0%');
+      expect(summary.llm.cacheHitRate).toBe('90.0%');
     });
   });
 
@@ -325,10 +323,10 @@ describe('Metrics', () => {
       metrics.recordRouterCall(200, false, true);
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.router.calls, 3);
-      assert.equal(summary.router.cacheHits, 1);
-      assert.equal(summary.router.fallbacks, 1);
-      assert.equal(summary.router.fallbackRate, '33.3%');
+      expect(summary.router.calls).toBe(3);
+      expect(summary.router.cacheHits).toBe(1);
+      expect(summary.router.fallbacks).toBe(1);
+      expect(summary.router.fallbackRate).toBe('33.3%');
     });
   });
 
@@ -352,8 +350,8 @@ describe('Metrics', () => {
       });
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.conversations.total, 1);
-      assert.equal(summary.conversations.totalCost, 0.003);
+      expect(summary.conversations.total).toBe(1);
+      expect(summary.conversations.totalCost).toBe(0.003);
     });
 
     it('should track per-user stats', () => {
@@ -373,7 +371,7 @@ describe('Metrics', () => {
       });
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.users.total, 1);
+      expect(summary.users.total).toBe(1);
     });
   });
 
@@ -387,8 +385,8 @@ describe('Metrics', () => {
       metrics.recordToolCall('get_client', 20, true);
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.topToolsByUsage[0].name, 'search_clients');
-      assert.equal(summary.topToolsByUsage[0].calls, 3);
+      expect(summary.topToolsByUsage[0].name).toBe('search_clients');
+      expect(summary.topToolsByUsage[0].calls).toBe(3);
     });
 
     it('should return top tools by error rate (min 3 calls)', () => {
@@ -397,14 +395,14 @@ describe('Metrics', () => {
       metrics.recordToolCall('flaky_tool', 50, false);
 
       let summary = metrics.getMetricsSummary();
-      assert.equal(summary.topToolsByErrorRate.length, 0);
+      expect(summary.topToolsByErrorRate.length).toBe(0);
 
       // Now 3 calls — should appear
       metrics.recordToolCall('flaky_tool', 50, true);
       summary = metrics.getMetricsSummary();
-      assert.equal(summary.topToolsByErrorRate.length, 1);
-      assert.equal(summary.topToolsByErrorRate[0].name, 'flaky_tool');
-      assert.equal(summary.topToolsByErrorRate[0].errorRate, '66.7%');
+      expect(summary.topToolsByErrorRate.length).toBe(1);
+      expect(summary.topToolsByErrorRate[0].name).toBe('flaky_tool');
+      expect(summary.topToolsByErrorRate[0].errorRate).toBe('66.7%');
     });
   });
 
@@ -428,7 +426,7 @@ describe('Metrics', () => {
       });
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.avgChainLength, 3.0);
+      expect(summary.avgChainLength).toBe(3.0);
     });
   });
 
@@ -437,14 +435,14 @@ describe('Metrics', () => {
   describe('getLatencyPercentiles', () => {
     it('should return zeros for empty array', () => {
       const result = metrics.getLatencyPercentiles([]);
-      assert.deepEqual(result, { p50: 0, p95: 0, p99: 0 });
+      expect(result).toEqual({ p50: 0, p95: 0, p99: 0 });
     });
 
     it('should handle single value', () => {
       const result = metrics.getLatencyPercentiles([42]);
-      assert.equal(result.p50, 42);
-      assert.equal(result.p95, 42);
-      assert.equal(result.p99, 42);
+      expect(result.p50).toBe(42);
+      expect(result.p95).toBe(42);
+      expect(result.p99).toBe(42);
     });
   });
 
@@ -466,11 +464,11 @@ describe('Metrics', () => {
       metrics.clearAll();
 
       const summary = metrics.getMetricsSummary();
-      assert.deepEqual(summary.tools, {});
-      assert.equal(summary.llm.calls, 0);
-      assert.equal(summary.router.calls, 0);
-      assert.equal(summary.conversations.total, 0);
-      assert.equal(summary.users.total, 0);
+      expect(summary.tools).toEqual({});
+      expect(summary.llm.calls).toBe(0);
+      expect(summary.router.calls).toBe(0);
+      expect(summary.conversations.total).toBe(0);
+      expect(summary.users.total).toBe(0);
     });
   });
 });
@@ -507,12 +505,12 @@ describe('Observability Integration', () => {
       });
 
       // Verify log was emitted
-      assert.equal(logs.length, 1);
-      assert.equal(logs[0].type, 'tool_execution');
+      expect(logs.length).toBe(1);
+      expect(logs[0].type).toBe('tool_execution');
 
       // Verify metrics were recorded
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.tools['search_clients'].calls, 1);
+      expect(summary.tools['search_clients'].calls).toBe(1);
     });
 
     it('should create hooks that log and record LLM calls', () => {
@@ -527,12 +525,12 @@ describe('Observability Integration', () => {
         cost: 0.00035,
       });
 
-      assert.equal(logs.length, 1);
-      assert.equal(logs[0].type, 'llm_call');
+      expect(logs.length).toBe(1);
+      expect(logs[0].type).toBe('llm_call');
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.llm.calls, 1);
-      assert.equal(summary.llm.totalInputTokens, 4200);
+      expect(summary.llm.calls).toBe(1);
+      expect(summary.llm.totalInputTokens).toBe(4200);
     });
 
     it('should create hooks that log and record router calls', () => {
@@ -547,11 +545,11 @@ describe('Observability Integration', () => {
         durationMs: 150,
       });
 
-      assert.equal(logs.length, 1);
-      assert.equal(logs[0].type, 'router_call');
+      expect(logs.length).toBe(1);
+      expect(logs[0].type).toBe('router_call');
 
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.router.calls, 1);
+      expect(summary.router.calls).toBe(1);
     });
   });
 
@@ -574,13 +572,13 @@ describe('Observability Integration', () => {
       });
 
       // Verify summary log
-      assert.equal(logs.length, 1);
-      assert.equal(logs[0].type, 'agent_request');
+      expect(logs.length).toBe(1);
+      expect(logs[0].type).toBe('agent_request');
 
       // Verify conversation metrics were recorded
       const summary = metrics.getMetricsSummary();
-      assert.equal(summary.conversations.total, 1);
-      assert.equal(summary.conversations.totalCost, 0.0012);
+      expect(summary.conversations.total).toBe(1);
+      expect(summary.conversations.totalCost).toBe(0.0012);
     });
   });
 });
