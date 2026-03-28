@@ -4,7 +4,9 @@
 >
 > Forked from [IDURAR](https://github.com/idurar/idurar-erp-crm) and extended with a full AI agent layer.
 >
-> **Live Demo:** [idurar.anandbhagat.com](https://idurar.anandbhagat.com/)
+> **Live Demo:** [idurar-erp-crm.anandbhagat.com](https://idurar-erp-crm.anandbhagat.com/)
+
+<img src="./frontend/public/demo.gif">
 
 ## What I Built
 
