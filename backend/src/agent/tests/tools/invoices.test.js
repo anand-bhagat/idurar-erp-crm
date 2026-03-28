@@ -878,7 +878,7 @@ describe('Invoice Tools', () => {
   // Tool Definitions & Registration
   // =========================================================================
   describe('Tool Definitions', () => {
-    it('should define all 9 tools', () => {
+    it('should define all 10 tools', () => {
       const names = Object.keys(toolDefinitions);
       expect(names).toEqual([
         'get_invoice',
@@ -889,6 +889,7 @@ describe('Invoice Tools', () => {
         'update_invoice',
         'delete_invoice',
         'navigate_to_invoices',
+        'navigate_to_invoice',
         'navigate_to_create_invoice',
       ]);
     });

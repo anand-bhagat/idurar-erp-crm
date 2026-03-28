@@ -213,13 +213,21 @@ async function executeTool(name, params, context) {
   }
 
   if (tool.execution === 'frontend') {
+    // Build dynamic route by replacing :param placeholders with actual values
+    let route = tool.frontendAction.route || undefined;
+    if (route && params) {
+      for (const [key, value] of Object.entries(params)) {
+        route = route.replace(`:${key}`, value);
+      }
+    }
+
     return {
       type: 'frontend_action',
       tool: name,
       actionType: tool.frontendAction.type,
       store: tool.frontendAction.store || undefined,
       action: tool.frontendAction.action || undefined,
-      route: tool.frontendAction.route || undefined,
+      route,
       params,
     };
   }

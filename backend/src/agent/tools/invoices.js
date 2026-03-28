@@ -3,7 +3,7 @@
  *
  * Tools: get_invoice, list_invoices, search_invoices, get_invoice_summary,
  *        create_invoice, update_invoice, delete_invoice,
- *        navigate_to_invoices, navigate_to_create_invoice
+ *        navigate_to_invoice, navigate_to_invoices, navigate_to_create_invoice
  *
  * Category: invoices
  */
@@ -866,6 +866,28 @@ const toolDefinitions = {
     frontendAction: {
       type: 'navigate',
       route: '/invoice',
+    },
+  },
+
+  navigate_to_invoice: {
+    schema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'MongoDB ObjectId of the invoice to view',
+        },
+      },
+      required: ['id'],
+    },
+    description:
+      'Navigate to a single invoice detail page. Shows the full invoice with line items, totals, payment history, and status. Pass the invoice ID to open its detail view.',
+    execution: 'frontend',
+    access: 'authenticated',
+    category: 'invoices',
+    frontendAction: {
+      type: 'navigate',
+      route: '/invoice/read/:id',
     },
   },
 
