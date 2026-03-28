@@ -4,7 +4,7 @@ import { Avatar, Dropdown, Layout, Badge, Button } from 'antd';
 
 // import Notifications from '@/components/Notification';
 
-import { LogoutOutlined, ToolOutlined, UserOutlined } from '@ant-design/icons';
+import { InfoCircleOutlined, LogoutOutlined, ToolOutlined, UserOutlined } from '@ant-design/icons';
 
 import { selectCurrentAdmin } from '@/redux/auth/selectors';
 
@@ -12,7 +12,6 @@ import { FILE_BASE_URL } from '@/config/serverApiConfig';
 
 import useLanguage from '@/locale/useLanguage';
 
-import UpgradeButton from './UpgradeButton';
 
 export default function HeaderContent() {
   const currentAdmin = useSelector(selectCurrentAdmin);
@@ -72,6 +71,11 @@ export default function HeaderContent() {
       key: 'settingApp',
       label: <Link to={'/settings'}>{translate('app_settings')}</Link>,
     },
+    {
+      icon: <InfoCircleOutlined />,
+      key: 'about',
+      label: <Link to={'/about'}>About</Link>,
+    },
 
     {
       type: 'divider',
@@ -123,7 +127,6 @@ export default function HeaderContent() {
 
       {/* <AppsButton /> */}
 
-      <UpgradeButton />
     </Header>
   );
 }

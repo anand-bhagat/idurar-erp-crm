@@ -1,0 +1,86 @@
+/* -- Welcome Modal --------------------------------------------------------- */
+
+.welcome-modal .ant-modal-content {
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.welcome-body {
+  padding: 0.5rem 0.25rem 0;
+}
+
+.welcome-headline {
+  margin-bottom: 0.35rem !important;
+  text-align: center;
+}
+
+.welcome-oneliner {
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1.25rem !important;
+  text-align: center;
+}
+
+/* Notes */
+.welcome-note {
+  text-align: center;
+  color: #888;
+  font-size: 0.8rem;
+  margin-bottom: 0.35rem !important;
+}
+
+.welcome-note-small {
+  text-align: center;
+  color: #aaa;
+  font-size: 0.72rem;
+  margin-bottom: 1rem !important;
+  line-height: 1.5;
+}
+
+/* Technical details collapse */
+.welcome-details-collapse {
+  margin-bottom: 1rem;
+}
+
+.welcome-details-collapse .ant-collapse-header {
+  padding: 8px 0 !important;
+}
+
+.welcome-details-collapse .ant-collapse-content-box {
+  padding: 0 !important;
+}
+
+.welcome-details-content {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.welcome-details-content ul {
+  margin: 0.25rem 0 0.75rem 0;
+  padding-left: 18px;
+}
+
+.welcome-details-content li {
+  margin-bottom: 2px;
+  color: #555;
+}
+
+/* GitHub link */
+.welcome-github {
+  text-align: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+.welcome-github a {
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
