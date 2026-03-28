@@ -54,7 +54,12 @@ function checkBudget(conversationId, additionalTokens = 0) {
  * @returns {number} New total usage
  */
 function trackUsage(conversationId, usage) {
-  const tokens = (usage.inputTokens || 0) + (usage.outputTokens || 0);
+  // Only count NEW tokens — subtract cached input tokens which are repeated
+  // context (system prompt, tool schemas, prior messages) resent every call.
+  // Without this, a 5-message conversation can exhaust the budget because
+  // the full context is re-counted on every LLM call.
+  const inputTokens = (usage.inputTokens || 0) - (usage.cachedTokens || 0);
+  const tokens = Math.max(0, inputTokens) + (usage.outputTokens || 0);
   const current = conversationTokenUsage.get(conversationId) || 0;
   const total = current + tokens;
   conversationTokenUsage.set(conversationId, total);

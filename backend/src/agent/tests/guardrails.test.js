@@ -511,12 +511,19 @@ describe('tokenBudget', () => {
   });
 
   describe('trackUsage', () => {
-    it('should accumulate token usage', () => {
-      tokenBudget.trackUsage('conv-track', { inputTokens: 100, outputTokens: 50 });
+    it('should count only new (non-cached) input tokens + output tokens', () => {
+      tokenBudget.trackUsage('conv-track', { inputTokens: 1000, outputTokens: 50, cachedTokens: 900 });
+      // new input = 1000 - 900 = 100, output = 50, total = 150
       expect(tokenBudget.getUsage('conv-track')).toBe(150);
 
-      tokenBudget.trackUsage('conv-track', { inputTokens: 200, outputTokens: 100 });
+      tokenBudget.trackUsage('conv-track', { inputTokens: 2000, outputTokens: 100, cachedTokens: 1800 });
+      // new input = 200, output = 100, cumulative = 150 + 300 = 450
       expect(tokenBudget.getUsage('conv-track')).toBe(450);
+    });
+
+    it('should count full input when no cached tokens', () => {
+      tokenBudget.trackUsage('conv-nocache', { inputTokens: 500, outputTokens: 200 });
+      expect(tokenBudget.getUsage('conv-nocache')).toBe(700);
     });
 
     it('should handle missing token fields', () => {
